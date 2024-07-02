@@ -1,0 +1,214 @@
+import sqlite3
+import time
+from datetime import datetime, timezone, timedelta
+import openpyxl
+
+# 导入数据
+def import_data(db: sqlite3.Connection, file_dict: dict, station_filename: str, weather_filename: str):
+    urbanStation, ruralStation = import_station_info(db, station_filename)
+    import_to_sqlite3_db(db, urbanStation, ruralStation, file_dict)
+    # delete_5_percent(db)
+    import_weather(db, weather_filename)
+
+def import_to_sqlite3_db(db: sqlite3.Connection, urban_station: set, rural_station: set, file_dict: dict):
+    # 城区温度表
+    db.execute(
+        'create table if not exists urban_tem('
+        '   station int not null,'
+        '   tem real not null,'
+        '   dtime datetime not null'
+        ')'
+    )
+    db.execute('delete from urban_tem')
+    # 郊区温度表
+    db.execute(
+        'create table if not exists rural_tem('
+        '   station int not null,'
+        '   tem real not null,'
+        '   dtime datetime not null'
+        ')'
+    )
+    db.execute('delete from rural_tem')
+
+    for filename, year in file_dict.items():
+        import_excel_to_db(db, urban_station, rural_station, filename, year)
+
+def import_excel_to_db(db: sqlite3.Connection, urban_station: set, rural_station: set, filename: str, year: int):
+    unknow_station = set()
+    insert_cnt = 0
+    excel = openpyxl.load_workbook(filename, read_only=True)
+    for sheet_name in excel.sheetnames:
+        print('开始处理:{}, {}'.format(filename, sheet_name))
+        for i, row in enumerate(excel[sheet_name].rows):
+            if i + 1 == 1 or row[1].value is None:
+                continue
+
+            station = int(row[1].value)
+            tem = float(row[7].value)
+            dtime = datetime(
+                year, int(row[4].value), int(row[5].value), int(row[6].value), tzinfo=timezone.utc
+            ).astimezone(timezone(timedelta(hours=8)))
+
+            if station in urban_station:
+                db.execute(
+                    'insert into urban_tem values(?,?,?)',
+                    [station, tem, dtime.strftime('%Y-%m-%d %H:%M:%S')],
+                )
+            elif station in rural_station:
+                db.execute(
+                    'insert into rural_tem values(?,?,?)',
+                    [station, tem, dtime.strftime('%Y-%m-%d %H:%M:%S')],
+                )
+            else:
+                unknow_station.add(station)
+
+            insert_cnt += 1
+            if insert_cnt > 50000:
+                insert_cnt = 0
+                db.commit()
+    db.commit()
+
+    if unknow_station:
+        print('station:{} 没有未设置分类'.format(unknow_station))
+    excel.close()
+
+
+# 获取所有站点并区分城郊
+def import_station_info(db: sqlite3.Connection, station_filename: str) -> (set, set):
+    db.execute(
+        'create table if not exists station_info('
+        '   station int not null,'
+        '   is_urban int not null'
+        ')'
+    )
+    db.execute('delete from station_info')
+
+    excel = openpyxl.load_workbook(station_filename)
+
+    urbanStation = []
+    ruralStation = []
+
+    for i, row in enumerate(excel['Urban'].rows):
+        if i + 1 == 1 or row[1].value is None:
+            continue
+        urbanStation.append(int(row[1].value))
+        db.execute('insert into station_info values(?,?)', [row[1].value, 1])
+
+    for i, row in enumerate(excel['Rural'].rows):
+        if i + 1 == 1 or row[1].value is None:
+            continue
+        ruralStation.append(int(row[1].value))
+        db.execute('insert into station_info values(?,?)', [row[1].value, 0])
+
+    db.commit()
+    excel.close()
+    return set(urbanStation), set(ruralStation)
+
+
+def import_weather(db: sqlite3.Connection, filename: str):
+    db.execute(
+        'create table if not exists weather('
+        '   dtime datetime not null,'
+        '   weather text not null,'
+        '   weather_index int not null'
+        ')'
+    )
+    db.execute('delete from weather')
+
+    excel = openpyxl.load_workbook(filename)
+
+    for i, row in enumerate(excel.active.rows):
+        if i + 1 == 1 or row[1].value is None or row[6].value is None:
+            continue
+        db.execute('insert into weather values(?,?,?)', [row[1].value, row[5].value, row[6].value])
+
+    db.commit()
+    excel.close()
+
+# def delete_5_percent(db: sqlite3.Connection):
+#
+#     # 删除城区按温度排序前后百分之5的数据
+#     rlt = db.execute(
+#         'select count(*) from urban_tem'
+#         # 'select count(*) from weather',
+#     )
+#     total = rlt.fetchall()[0][0]
+#
+#     # 从weather表格中删除不是晴天对应的所有行
+#     db.execute(
+#         'delete from urban_tem where dtime in (select t1.dtime from urban_tem as t1 left join weather as t2 on date(t1.dtime) = t2.dtime where weather not like "%晴%")'
+#     )
+#     # db.execute(
+#     #     'delete from urban_tem where rowid in (select rowid from urban_tem order by tem limit ?)',
+#     #     [int(total * 0.01)],
+#     # )
+#     # db.execute(
+#     #     'delete from urban_tem where rowid in (select rowid from urban_tem order by tem desc limit ?)',
+#     #     [int(total * 0.01)],
+#     # )
+#
+#     # 删除郊区按温度排序前后百分之5的数据
+#     rlt = db.execute(
+#         'select count(*) from rural_tem'
+#         # 'select count(*) from weather',
+#     )
+#     total = rlt.fetchall()[0][0]
+#     # db = sqlite3.connect("weather.db")
+#     # 从weather表格中删除不是晴天对应的所有行
+#     db.execute(
+#         'delete from rural_tem where dtime in (select t1.dtime from rural_tem as t1 left join weather as t2 on date(t1.dtime) = t2.dtime where weather not like "%晴%")'
+#     )
+#
+#     # db.execute(
+#     #     'delete from rural_tem where rowid in (select rowid from rural_tem order by tem limit ?)',
+#     #     [int(total * 0.01)],
+#     # )
+#     # db.execute(
+#     #     'delete from rural_tem where rowid in (select rowid from rural_tem order by tem desc limit ?)',
+#     #     [int(total * 0.01)],
+#     # )
+#
+#     db.commit()
+
+def delete_5_percent(db: sqlite3.Connection):
+    # 删除城区按温度排序前后百分之5的数据
+    rlt = db.execute(
+        'select count(*) from urban_tem'
+    )
+    total = rlt.fetchall()[0][0]
+
+    db.execute(
+        'delete from urban_tem where rowid in (select rowid from urban_tem order by tem limit ?)',
+        [int(total * 0.05)],
+    )
+    db.execute(
+        'delete from urban_tem where rowid in (select rowid from urban_tem order by tem desc limit ?)',
+        [int(total * 0.05)],
+    )
+
+    # 删除郊区按温度排序前后百分之5的数据
+    rlt = db.execute(
+        'select count(*) from rural_tem'
+    )
+    total = rlt.fetchall()[0][0]
+
+    db.execute(
+        'delete from rural_tem where rowid in (select rowid from rural_tem order by tem limit ?)',
+        [int(total * 0.05)],
+    )
+    db.execute(
+        'delete from rural_tem where rowid in (select rowid from rural_tem order by tem desc limit ?)',
+        [int(total * 0.05)],
+    )
+
+    db.commit()
+
+if __name__ == '__main__':
+    # with sqlite3.connect('date.db') as db:
+    #     print('开始处理站点信息：', time.perf_counter())
+    #     urbanStation, ruralStation = import_station_info(db)
+    #     print('开始处理数据：', time.perf_counter())
+    #     import_to_sqlite3_db(db, urbanStation, ruralStation)
+    with sqlite3.connect('date.db') as db:
+        delete_5_percent(db)
+    print('结束：', time.perf_counter())
