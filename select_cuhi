@@ -1,0 +1,593 @@
+import sqlite3
+import openpyxl
+import time
+
+
+# 站点 天 时 CUHI
+def select_station_day_hour_cuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,strftime('%j',dtime),strftime('%H',dtime),avg_urban_tem-avg_rural_tem from "
+
+        # 获取城区数据
+        "(select station,dtime,avg(tem) as avg_urban_tem "
+        "from urban_tem group by station,strftime('%j %H',dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join (select strftime('%j %H',dtime) as tmp_d,avg(tem) as avg_rural_tem "
+        "from rural_tem group by strftime('%j %H',dtime)) as t2 "
+        "on strftime('%j %H',dtime)=tmp_d "
+
+        "group by station,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'day', 'hour', 'cuhi'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+
+# 站点 周 时 CUHI(修改，需要添加新avg_urban_tem_wd)
+def select_station_weekday_hour_cuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,strftime('%w',t1.dtime),strftime('%H',t1.dtime),avg_urban_tem-avg_rural_tem from"
+
+        # 获取城区数据
+        "(select station,dtime,avg(tem) as avg_urban_tem "
+        "from urban_tem group by station,strftime('%w %H',dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join (select dtime,avg(tem) as avg_rural_tem "
+        "from rural_tem group by strftime('%w %H',dtime)) as t2 "
+        "on strftime('%w %H',t1.dtime)=strftime('%w %H',t2.dtime) "
+
+        "group by station,strftime('%w %H',t1.dtime)"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'weekday', 'hour', 'cuhi','urban_weekday','urban_weekends','urban_wcuhi'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+# 站点 月 周 时 CUHI
+def select_station_month_hour_cuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,strftime('%m',dtime),strftime('%w',dtime),strftime('%H',dtime),"
+        "avg_urban_tem-avg_rural_tem from "
+
+        # 获取城区数据
+        "(select station,dtime,avg(tem) as avg_urban_tem "
+        "from urban_tem group by station,strftime('%m %w %H',dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join (select strftime('%m %w %H',dtime) as tmp_d,avg(tem) as avg_rural_tem "
+        "from rural_tem group by strftime('%m %w %H',dtime)) as t2 "
+        "on strftime('%m %w %H',dtime)=tmp_d "
+
+        "group by station,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'month', 'weekday', 'hour', 'cuhi'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+
+# 站点 季 周 时 CUHI
+def select_station_season_hour_cuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,strftime('%m',dtime)/3%4,strftime('%w',dtime),strftime('%H',dtime),"
+        "avg_urban_tem-avg_rural_tem from "
+
+        # 获取城区数据
+        "(select station,dtime,avg(tem) as avg_urban_tem "
+        "from urban_tem group by station,(strftime('%m',dtime)/3%4)||strftime(' %w %H',dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join (select (strftime('%m',dtime)/3%4)||strftime(' %w %H',dtime) as tmp_d,avg(tem) as avg_rural_tem "
+        "from rural_tem group by (strftime('%m',dtime)/3%4)||strftime(' %w %H',dtime)) as t2 "
+        "on (strftime('%m',dtime)/3%4)||strftime(' %w %H',dtime)=tmp_d "
+
+        "group by station,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'season', 'weekday', 'hour', 'cuhi'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+
+# 站点 天气 周 时 CUHI
+def select_weather_station_weekday_hour_cuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,weather_index,strftime('%w',dtime),strftime('%H',dtime),avg_urban_tem-avg_rural_tem from "
+
+        # 获取城区数据
+        "(select station,weather_index,urban_tem.dtime as dtime,avg(tem) as avg_urban_tem "
+        "from urban_tem left join weather on weather.dtime=strftime('%Y-%m-%d',urban_tem.dtime) "
+        "where weather_index is not null "
+        "group by station,weather_index,strftime('%w %H',urban_tem.dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join(select weather_index as tmp_w,strftime('%w %H',rural_tem.dtime) as tmp_d,avg(tem) as avg_rural_tem "
+        "from rural_tem left join weather on weather.dtime=strftime('%Y-%m-%d',rural_tem.dtime) "
+        "where weather_index is not null "
+        "group by weather_index,strftime('%w %H',rural_tem.dtime)) as t2 "
+        "on weather_index=tmp_w and strftime('%w %H',dtime)=tmp_d "
+
+        "group by station,weather_index,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'weather', 'weekday', 'hour', 'cuhi'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+# 站点 时 周CUHI
+# def select_station_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+#     rlt = db.execute(
+#         "select station,strftime('%H',dtime),"
+#         "avg_urban_wd_tem-avg_rural_wd_tem,"
+#         "avg_urban_we_tem-avg_rural_we_tem,"
+#         "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem from "
+#
+#         "(select station,dtime,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_urban_we_tem "
+#         "from urban_tem group by station,strftime('%H',dtime)) as t1 "
+#
+#         "left join (select strftime('%H',dtime) as tmp_d,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+#         "from rural_tem group by strftime('%H',dtime)) as t2 "
+#         "on strftime('%H',dtime)=tmp_d "
+#
+#         "group by station,tmp_d"
+#     )
+#
+#     excel = openpyxl.Workbook()
+#     excel.active.append(['station', 'hour', 'workday', 'weekend', 'cuhi'])
+#     for v in rlt:
+#         excel.active.append(v)
+#     excel.save(output_filename)
+#     excel.close()
+
+# # 站点 时 周CUHI(修改后)
+# def select_station_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+#     rlt = db.execute(
+#         "select station,strftime('%H',dtime),"
+#         "avg_urban_wd_tem-avg_rural_wd_tem,"
+#         "avg_urban_we_tem-avg_rural_we_tem,"
+#         "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem,avg_urban_wd_tem,avg_urban_we_tem,"
+#         "avg_urban_we_tem-avg_urban_wd_tem,avg_rural_wd_tem,avg_rural_we_tem,avg_rural_we_tem-avg_rural_wd_tem from "
+#
+#         "(select station,dtime,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_urban_we_tem "
+#         "from urban_tem group by station,strftime('%H',dtime)) as t1 "
+#
+#         "left join (select strftime('%H',dtime) as tmp_d,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+#         "from rural_tem group by strftime('%H',dtime)) as t2 "
+#         "on strftime('%H',dtime)=tmp_d "
+#
+#         "group by station,tmp_d"
+#     )
+#
+#     excel = openpyxl.Workbook()
+#     excel.active.append(['station', 'hour', 'workday', 'weekend', 'cuhi','urban_workday','urban_weekends','urban_wcuhi','rural_workday','rural_weekends','rural_wcuhi'])
+#     for v in rlt:
+#         excel.active.append(v)
+#     excel.save(output_filename)
+#     excel.close()
+
+# 站点 时 周一CUHI
+# def select_station_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+#     rlt = db.execute(
+#         "select station,strftime('%H',dtime),"
+#         "avg_urban_wd_tem-avg_rural_wd_tem,"
+#         "avg_urban_we_tem-avg_rural_we_tem,"
+#         "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem from "
+#
+#         "(select station,dtime,"
+#         "avg(case strftime('%w',dtime) when '1' then tem end) as avg_urban_wd_tem,"
+#         "avg(case strftime('%w',dtime) when '1' then null else tem end) as avg_urban_we_tem "
+#         "from urban_tem group by station,strftime('%H',dtime)) as t1 "
+#
+#         "left join (select strftime('%H',dtime) as tmp_d,"
+#         "avg(case strftime('%w',dtime) when '1' then tem end) as avg_rural_wd_tem,"
+#         "avg(case strftime('%w',dtime) when '1' then null else tem end) as avg_rural_we_tem "
+#         "from rural_tem group by strftime('%H',dtime)) as t2 "
+#         "on strftime('%H',dtime)=tmp_d "
+#
+#         "group by station,tmp_d"
+#     )
+#
+#     excel = openpyxl.Workbook()
+#     excel.active.append(['station', 'hour', 'workday', 'weekend', 'cuhi'])
+#     for v in rlt:
+#         excel.active.append(v)
+#     excel.save(output_filename)
+#     excel.close()
+
+# 站点 时 周一至周日cuhi以及周效应（周一cuhi与工作日cuhi之差定义为周一效应）
+def select_station_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,strftime('%H',dtime),"
+        "avg_urban_mon_tem-avg_rural_mon_tem,"
+        "avg_urban_tue_tem-avg_rural_tue_tem,"
+        "avg_urban_wed_tem-avg_rural_wed_tem,"
+        "avg_urban_thur_tem-avg_rural_thur_tem,"
+        "avg_urban_fri_tem-avg_rural_fri_tem,"
+        "avg_urban_sat_tem-avg_rural_sat_tem,"
+        "avg_urban_sun_tem-avg_rural_sun_tem,"
+        "avg_urban_wd_tem-avg_rural_wd_tem,"
+        "avg_urban_mon_tem-avg_rural_mon_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+        "avg_urban_tue_tem-avg_rural_tue_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+        "avg_urban_wed_tem-avg_rural_wed_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+        "avg_urban_thur_tem-avg_rural_thur_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+        "avg_urban_fri_tem-avg_rural_fri_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+        "avg_urban_sat_tem-avg_rural_sat_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+        "avg_urban_sun_tem-avg_rural_sun_tem-avg_urban_wd_tem+avg_rural_wd_tem from "
+        #"avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem from "
+        #"avg_urban_wd_tem,avg_urban_we_tem,avg_urban_wd_tem-avg_urban_we_tem from"
+
+        "(select station,dtime,"
+        "avg(case strftime('%w',dtime) when '1' then tem end) as avg_urban_mon_tem,"
+        "avg(case strftime('%w',dtime) when '2' then tem end) as avg_urban_tue_tem,"
+        "avg(case strftime('%w',dtime) when '3' then tem end) as avg_urban_wed_tem,"
+        "avg(case strftime('%w',dtime) when '4' then tem end) as avg_urban_thur_tem,"
+        "avg(case strftime('%w',dtime) when '5' then tem end) as avg_urban_fri_tem,"
+        "avg(case strftime('%w',dtime) when '6' then tem end) as avg_urban_sat_tem,"
+        "avg(case strftime('%w',dtime) when '0' then tem end) as avg_urban_sun_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem "
+        "from urban_tem group by station,strftime('%H',dtime)) as t1 "
+
+        "left join (select strftime('%H',dtime) as tmp_d,"
+        "avg(case strftime('%w',dtime) when '1' then tem end) as avg_rural_mon_tem,"
+        "avg(case strftime('%w',dtime) when '2' then tem end) as avg_rural_tue_tem,"
+        "avg(case strftime('%w',dtime) when '3' then tem end) as avg_rural_wed_tem,"
+        "avg(case strftime('%w',dtime) when '4' then tem end) as avg_rural_thur_tem,"
+        "avg(case strftime('%w',dtime) when '5' then tem end) as avg_rural_fri_tem,"
+        "avg(case strftime('%w',dtime) when '6' then tem end) as avg_rural_sat_tem,"
+        "avg(case strftime('%w',dtime) when '0' then tem end) as avg_rural_sun_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem "
+        #"avg(case strftime('%w',dtime) when '5' then null else tem end) as avg_rural_we_tem "
+        "from rural_tem group by strftime('%H',dtime)) as t2 "
+        "on strftime('%H',dtime)=tmp_d "
+
+        "group by station,tmp_d"
+    )
+#wcuhi_mon至wcuhi_sun分别代表周一cuhi减工作日平均cuhi,周二减工作日，周三减工作日，依次类推
+    excel = openpyxl.Workbook()
+    excel.active.append(['station','hour','mon','tue','wed','thur',
+                         'fri','sat','sun','wd','wcuhi_mon','wcuhi_tue','wcuhi_wed',
+                         'wcuhi_thur','wcuhi_fri','wcuhi_sat','wcuhi_sun'])
+
+    # excel.active.append(['station', 'hour', 'mon','cuhi1','tue','non-tue',
+    #                      'cuhi2','wed','non-wed','cuhi3','thur','non-thur','cuhi4',
+    #                      'fri','non-fri','cuhi5','sat','non-sat','cuhi6','sun',
+    #                      'non-sun','cuhi7'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+# #站点 月 时 周CUHI
+def select_station_month_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,strftime('%m',dtime),strftime('%H',dtime),"
+        "avg_urban_wd_tem-avg_rural_wd_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem,avg_urban_wd_tem,avg_urban_we_tem,"
+        "avg_urban_we_tem-avg_urban_wd_tem,avg_rural_wd_tem,avg_rural_we_tem,avg_rural_we_tem-avg_rural_wd_tem from "
+
+        # 获取城区数据
+        "(select station,dtime,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_urban_we_tem "
+        "from urban_tem group by station,strftime('%m %H',dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join (select strftime('%m %H',dtime) as tmp_d,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+        "from rural_tem group by strftime('%m %H',dtime)) as t2 "
+        "on strftime('%m %H',dtime)=tmp_d "
+
+        "group by station,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'month','hour', 'workday', 'weekend', 'cuhi','urban_workday','urban_weekends','urban_wcuhi','rural_workday','rural_weekends','rural_wcuhi'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+#站点 月 时 周一至周日CUHI
+# def select_station_month_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+#     rlt = db.execute(
+#         "select station,strftime('%m',dtime),strftime('%H',dtime),"
+#         "avg_urban_mon_tem-avg_rural_mon_tem,"
+#         "avg_urban_tue_tem-avg_rural_tue_tem,"
+#         "avg_urban_wed_tem-avg_rural_wed_tem,"
+#         "avg_urban_thur_tem-avg_rural_thur_tem,"
+#         "avg_urban_fri_tem-avg_rural_fri_tem,"
+#         "avg_urban_sat_tem-avg_rural_sat_tem,"
+#         "avg_urban_sun_tem-avg_rural_sun_tem,"
+#         "avg_urban_wd_tem-avg_rural_wd_tem,"
+#         "avg_urban_mon_tem-avg_rural_mon_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_tue_tem-avg_rural_tue_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_wed_tem-avg_rural_wed_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_thur_tem-avg_rural_thur_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_fri_tem-avg_rural_fri_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_sat_tem-avg_rural_sat_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_sun_tem-avg_rural_sun_tem-avg_urban_wd_tem+avg_rural_wd_tem from "
+#         # "avg_urban_wd_tem-avg_rural_wd_tem,"
+#         # "avg_urban_we_tem-avg_rural_we_tem,"
+#         # "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem,avg_urban_wd_tem,avg_urban_we_tem,"
+#         # "avg_urban_we_tem-avg_urban_wd_tem,avg_rural_wd_tem,avg_rural_we_tem,avg_rural_we_tem-avg_rural_wd_tem from "
+#
+#         # 获取城区数据
+#         "(select station,dtime,"
+#         "avg(case strftime('%w',dtime) when '1' then tem end) as avg_urban_mon_tem,"
+#         "avg(case strftime('%w',dtime) when '2' then tem end) as avg_urban_tue_tem,"
+#         "avg(case strftime('%w',dtime) when '3' then tem end) as avg_urban_wed_tem,"
+#         "avg(case strftime('%w',dtime) when '4' then tem end) as avg_urban_thur_tem,"
+#         "avg(case strftime('%w',dtime) when '5' then tem end) as avg_urban_fri_tem,"
+#         "avg(case strftime('%w',dtime) when '6' then tem end) as avg_urban_sat_tem,"
+#         "avg(case strftime('%w',dtime) when '0' then tem end) as avg_urban_sun_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem "
+#         "from urban_tem group by station,strftime('%m %H',dtime)) as t1 "
+#
+#
+#         # 获取郊区数据
+#         "left join (select strftime('%m %H',dtime) as tmp_d,"
+#         "avg(case strftime('%w',dtime) when '1' then tem end) as avg_rural_mon_tem,"
+#         "avg(case strftime('%w',dtime) when '2' then tem end) as avg_rural_tue_tem,"
+#         "avg(case strftime('%w',dtime) when '3' then tem end) as avg_rural_wed_tem,"
+#         "avg(case strftime('%w',dtime) when '4' then tem end) as avg_rural_thur_tem,"
+#         "avg(case strftime('%w',dtime) when '5' then tem end) as avg_rural_fri_tem,"
+#         "avg(case strftime('%w',dtime) when '6' then tem end) as avg_rural_sat_tem,"
+#         "avg(case strftime('%w',dtime) when '0' then tem end) as avg_rural_sun_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem "
+#         # "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+#         "from rural_tem group by strftime('%m %H',dtime)) as t2 "
+#         "on strftime('%m %H',dtime)=tmp_d "
+#
+#         "group by station,tmp_d"
+#     )
+#
+#     excel = openpyxl.Workbook()
+#     excel.active.append(['station','month','hour','mon','tue','wed','thur',
+#                          'fri','sat','sun','wd','wcuhi_mon','wcuhi_tue','wcuhi_wed',
+#                          'wcuhi_thur','wcuhi_fri','wcuhi_sat','wcuhi_sun'])
+#     # excel.active.append(['station', 'month','hour', 'workday', 'weekend', 'cuhi','urban_workday','urban_weekends',
+#     #                      'urban_wcuhi','rural_workday','rural_weekends','rural_wcuhi'])
+#     for v in rlt:
+#         excel.active.append(v)
+#     excel.save(output_filename)
+#     excel.close()
+
+# 站点 季 时 周CUHI
+def select_station_season_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,strftime('%m',dtime)/3%4,strftime('%H',dtime),"
+        "avg_urban_wd_tem-avg_rural_wd_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem,avg_urban_wd_tem,avg_urban_we_tem,"
+        "avg_urban_we_tem-avg_urban_wd_tem,avg_rural_wd_tem,avg_rural_we_tem,avg_rural_we_tem-avg_rural_wd_tem from "
+
+        # 获取城区数据
+        "(select station,dtime,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_urban_we_tem "
+        "from urban_tem group by station,(strftime('%m',dtime)/3%4)||strftime('%H',dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join (select (strftime('%m',dtime)/3%4)||strftime('%H',dtime) as tmp_d,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+        "from rural_tem group by (strftime('%m',dtime)/3%4)||strftime('%H',dtime)) as t2 "
+        "on (strftime('%m',dtime)/3%4)||strftime('%H',dtime)=tmp_d "
+
+        "group by station,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station','season','hour', 'workday', 'weekend', 'cuhi','urban_workday','urban_weekends','urban_wcuhi','rural_workday','rural_weekends','rural_wcuhi'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+# 站点 季 时 周一至周日weekly cycles cuhi,0为冬季，1，2，3依次为春夏秋季
+# def select_station_season_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+#     rlt = db.execute(
+#         "select station,strftime('%m',dtime)/3%4,strftime('%H',dtime),"
+#         "avg_urban_mon_tem-avg_rural_mon_tem,"
+#         "avg_urban_tue_tem-avg_rural_tue_tem,"
+#         "avg_urban_wed_tem-avg_rural_wed_tem,"
+#         "avg_urban_thur_tem-avg_rural_thur_tem,"
+#         "avg_urban_fri_tem-avg_rural_fri_tem,"
+#         "avg_urban_sat_tem-avg_rural_sat_tem,"
+#         "avg_urban_sun_tem-avg_rural_sun_tem,"
+#         "avg_urban_wd_tem-avg_rural_wd_tem,"
+#         "avg_urban_mon_tem-avg_rural_mon_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_tue_tem-avg_rural_tue_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_wed_tem-avg_rural_wed_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_thur_tem-avg_rural_thur_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_fri_tem-avg_rural_fri_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_sat_tem-avg_rural_sat_tem-avg_urban_wd_tem+avg_rural_wd_tem,"
+#         "avg_urban_sun_tem-avg_rural_sun_tem-avg_urban_wd_tem+avg_rural_wd_tem from "
+#
+#         # "avg_urban_wd_tem-avg_rural_wd_tem,"
+#         # "avg_urban_we_tem-avg_rural_we_tem,"
+#         # "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem,avg_urban_wd_tem,avg_urban_we_tem,"
+#         # "avg_urban_we_tem-avg_urban_wd_tem,avg_rural_wd_tem,avg_rural_we_tem,avg_rural_we_tem-avg_rural_wd_tem from "
+#
+#         # 获取城区数据
+#         "(select station,dtime,"
+#         "avg(case strftime('%w',dtime) when '1' then tem end) as avg_urban_mon_tem,"
+#         "avg(case strftime('%w',dtime) when '2' then tem end) as avg_urban_tue_tem,"
+#         "avg(case strftime('%w',dtime) when '3' then tem end) as avg_urban_wed_tem,"
+#         "avg(case strftime('%w',dtime) when '4' then tem end) as avg_urban_thur_tem,"
+#         "avg(case strftime('%w',dtime) when '5' then tem end) as avg_urban_fri_tem,"
+#         "avg(case strftime('%w',dtime) when '6' then tem end) as avg_urban_sat_tem,"
+#         "avg(case strftime('%w',dtime) when '0' then tem end) as avg_urban_sun_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem "
+#         # "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_urban_we_tem "
+#         "from urban_tem group by station,(strftime('%m',dtime)/3%4)||strftime('%H',dtime)) as t1 "
+#
+#         # 获取郊区数据
+#         "left join (select (strftime('%m',dtime)/3%4)||strftime('%H',dtime) as tmp_d,"
+#         "avg(case strftime('%w',dtime) when '1' then tem end) as avg_rural_mon_tem,"
+#         "avg(case strftime('%w',dtime) when '2' then tem end) as avg_rural_tue_tem,"
+#         "avg(case strftime('%w',dtime) when '3' then tem end) as avg_rural_wed_tem,"
+#         "avg(case strftime('%w',dtime) when '4' then tem end) as avg_rural_thur_tem,"
+#         "avg(case strftime('%w',dtime) when '5' then tem end) as avg_rural_fri_tem,"
+#         "avg(case strftime('%w',dtime) when '6' then tem end) as avg_rural_sat_tem,"
+#         "avg(case strftime('%w',dtime) when '0' then tem end) as avg_rural_sun_tem,"
+#         "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem "
+#         # "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+#         "from rural_tem group by (strftime('%m',dtime)/3%4)||strftime('%H',dtime)) as t2 "
+#         "on (strftime('%m',dtime)/3%4)||strftime('%H',dtime)=tmp_d "
+#
+#         "group by station,tmp_d"
+#     )
+#
+#     excel = openpyxl.Workbook()
+#     excel.active.append(['station','season','hour','mon','tue','wed','thur',
+#                          'fri','sat','sun','wd','wcuhi_mon','wcuhi_tue','wcuhi_wed',
+#                          'wcuhi_thur','wcuhi_fri','wcuhi_sat','wcuhi_sun'])
+#     # excel.active.append(['station','season','hour', 'workday', 'weekend', 'cuhi','urban_workday','urban_weekends',
+#     #                      'urban_wcuhi','rural_workday','rural_weekends','rural_wcuhi'])
+#     for v in rlt:
+#         excel.active.append(v)
+#     excel.save(output_filename)
+#     excel.close()
+
+
+# 站点 天气 时 周CUHI
+def select_weather_station_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,weather_index,strftime('%H',dtime),"
+        "avg_urban_wd_tem-avg_rural_wd_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem,avg_urban_wd_tem,avg_urban_we_tem from "
+
+        # 获取城区数据
+        "(select station,weather_index,urban_tem.dtime as dtime,"
+        "avg(case ((strftime('%w',urban_tem.dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem,"
+        "avg(case ((strftime('%w',urban_tem.dtime)+4)/5%2) when 0 then tem end) as avg_urban_we_tem "
+        "from urban_tem left join weather on weather.dtime=strftime('%Y-%m-%d',urban_tem.dtime) "
+        "where weather_index is not null "
+        "group by station,weather_index,strftime('%H',urban_tem.dtime)) as t1 "
+
+        # 获取郊区数据
+        "left join(select weather_index as tmp_w,strftime('%H',rural_tem.dtime) as tmp_d,"
+        "avg(case ((strftime('%w',rural_tem.dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem,"
+        "avg(case ((strftime('%w',rural_tem.dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+        "from rural_tem left join weather on weather.dtime=strftime('%Y-%m-%d',rural_tem.dtime) "
+        "where weather_index is not null "
+        "group by weather_index,strftime('%H',rural_tem.dtime)) as t2 "
+        "on weather_index=tmp_w and strftime('%H',dtime)=tmp_d "
+
+        "group by station,weather_index,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'weather', 'hour', 'workday', 'weekend', 'cuhi','urban_workday','urban_weekends'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+# 站点 天气 时 周CUHI
+def select_weather_station_season_hour_wcuhi(db: sqlite3.Connection, output_filename: str):
+    rlt = db.execute(
+        "select station,weather_index,strftime('%m',dtime)/3%4,strftime('%H',dtime),"
+        "avg_urban_wd_tem-avg_rural_wd_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem,"
+        "avg_urban_we_tem-avg_rural_we_tem-avg_urban_wd_tem+avg_rural_wd_tem,avg_urban_wd_tem,avg_urban_we_tem from "
+
+        # 获取城区数据
+        "(select station,weather_index,dtime,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_urban_wd_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_urban_we_tem "
+        "from urban_tem left join weather on weather.dtime=strftime('%Y-%m-%d',urban_tem.dtime) "
+        "where weather_index is not null "
+        "group by station,weather_index,(strftime('%m',dtime)/3%4)||strftime('%H',dtime))as t1 "
+
+        # 获取郊区数据
+        "left join(select weather_index as tmp_w,strftime('%m',dtime)/3%4)||strftime('%H',dtime) as tmp_d,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) as avg_rural_wd_tem,"
+        "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end) as avg_rural_we_tem "
+        "from rural_tem left join weather on weather.dtime=strftime('%Y-%m-%d',rural_tem.dtime) "
+        "where weather_index is not null "
+        "group by station,weather_index, (strftime('%m',dtime)/3%4)||strftime('%H',dtime))as t2 "
+        "on weather_index=tmp_w and (strftime('%m',dtime)/3%4)||strftime('%H',dtime)=tmp_d "
+
+        "group by station,tmp_w,tmp_d"
+    )
+
+    excel = openpyxl.Workbook()
+    excel.active.append(['station', 'weather', 'season','hour', 'workday', 'weekend', 'cuhi','urban_workday','urban_weekends'])
+    for v in rlt:
+        excel.active.append(v)
+    excel.save(output_filename)
+    excel.close()
+
+if __name__ == '__main__':
+    with sqlite3.connect("date.db") as db:
+        last_pref_counter = time.perf_counter()
+
+        # select_station_day_hour_cuhi(db, "out/day.xlsx")
+        # select_station_weekday_hour_cuhi(db, "out/weekday.xlsx")
+        # select_station_month_hour_cuhi(db, "out/month.xlsx")
+        # select_station_season_hour_cuhi(db, "out/season.xlsx")
+        # select_weather_station_weekday_hour_cuhi(db, "out/weather.xlsx")
+        select_station_hour_wcuhi(db, "out/wcuhi.xlsx")
+        print(-last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+        select_station_month_hour_wcuhi(db, "out/month_wcuhi.xlsx")
+        print(-last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+        select_station_season_hour_wcuhi(db, "out/season_wcuhi.xlsx")
+        print(-last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+        select_weather_station_hour_wcuhi(db, "out/weather_wcuhi.xlsx")
+        print(-last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print(db.execute("select ((strftime('%w','2020-12-21')+9)/5%2)||strftime(' %H','2017-02-01')").fetchall())
+        # print(db.execute("select strftime('%w','now','+8 hours'),strftime('%H','now','+8 hours')").fetchall())
+
+        # rlt = db.execute(
+        #     "select station,strftime('%H',dtime),"
+        #     "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end),"
+        #     "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end),"
+        #     "avg(case ((strftime('%w',dtime)+4)/5%2) when 0 then tem end)-"
+        #     "avg(case ((strftime('%w',dtime)+4)/5%2) when 1 then tem end) "
+        #     "from urban_tem group by station,strftime('%H',dtime)"
+        # )
+        # excel = openpyxl.Workbook()
+        # for v in rlt:
+        #     print(v)
+        #     excel.active.append(v)
+        # excel.save("out/test.xlsx")
+        # excel.close()
+
+        print(-last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
