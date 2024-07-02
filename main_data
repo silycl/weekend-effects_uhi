@@ -1,0 +1,150 @@
+import sqlite3
+import time
+from import_data import import_data, import_weather
+import select_cuhi
+
+# 基础数据文件 键：文件路径 值：年份
+file = {
+    'E:/weeklyUHI/data-run/2017-2019/110000-2017.xlsx': 2017,
+    'E:/weeklyUHI/data-run/2017-2019/110000-2018.xlsx': 2018,
+    'E:/weeklyUHI/data-run/2017-2019/110000-2019.xlsx': 2019,
+}
+
+# 天气数据文件
+weather_filename = 'E:/weeklyUHI/weather_data/bj_sunny_cloud.xlsx'
+# 风向数据文件
+direction_filename = 'E:/weeklyUHI/weather_data/bj_wind_direction.xlsx'
+# 风速数据文件
+velocity_filename = 'E:/weeklyUHI/weather_data/bj_wind_velocity.xlsx'
+
+# 站点数据文件
+station_filename = 'E:/JGR-R1/typical_sta/110000_SiteInfo_LCZD.xlsx'
+
+# 数据库文件
+# 对不同城市使用不同数据库名称，可以避免多次导入
+db_filename = 'beijing_weekly.db'
+
+# 输出文件
+output_file = {
+     # 'day': 'E:/JGR-R1/LCZD_WIN_results/beijing_day.xlsx',
+     # 'weekday': 'E:/JGR-R1/LCZD_WIN_results/beijing_weekday.xlsx',
+     # 'month': 'E:/JGR-R1/LCZD_WIN_results/beijing_month.xlsx',
+     # 'season': 'E:/JGR-R1/LCZD_WIN_results/beijing_season.xlsx',
+     # 'weather': 'E:/JGR-R1/LCZD_WIN_results/weather.xlsx',
+     # 'wind_direction': 'E:/JGR-R1/LCZD_WIN_results/wind_direction.xlsx',
+     # 'wind_velocity': 'E:/JGR-R1/LCZD_WIN_results/wind_velocity.xlsx',
+
+     'wcuhi': 'E:/JGR-R1/weekly_cycles/beijing_weekly_wcuhi.xlsx',
+     # 'month_wcuhi': 'E:/JGR-R1/LCZD_WIN_results/beijing_month_wcuhi.xlsx',
+     # 'season_wcuhi': 'E:/JGR-R1/LCZD_WIN_results/beijing_season_wcuhi.xlsx',
+     # 'weather_wcuhi': 'E:/JGR-R1/LCZD_WIN_results/weather_wcuhi.xlsx',
+     # 'wind_direction_wcuhi': 'E:/JGR-R1/LCZD_WIN_results/wind_direction_wcuhi.xlsx',
+     # 'wind_velocity_wcuhi': 'E:/JGR-R1/LCZD_WIN_results/wind_velocity_wcuhi.xlsx'
+}
+
+if __name__ == '__main__':
+    with sqlite3.connect(db_filename) as db:
+        last_pref_counter = time.perf_counter()
+
+        # 此处为导入数据，如果已经导入过，则应该跳过
+        # 如果需要重新导入，应该删除对应的数据库文件
+        # print('开始导入数据')
+        # import_data(db, file, station_filename, weather_filename)
+        # print('导入数据结束', -last_pref_counter + time.perf_counter())
+        # last_pref_counter = time.perf_counter()
+        #
+        # # 导入天气数据
+        # print('开始导入天气数据')
+        # import_weather(db, weather_filename)
+        # print('导入天气数据结束', -last_pref_counter + time.perf_counter())
+        # last_pref_counter = time.perf_counter()
+
+        # 此处开始统计数据，可以跳过不需要统计的数据
+        # print('开始统计站点每天每时数据')
+        # select_cuhi.select_station_day_hour_cuhi(db, output_file['day'])
+        # print('统计站点每天每时数据结束', -last_pref_counter + time.perf_counter())
+        # last_pref_counter = time.perf_counter()
+        #
+        # print('开始统计站点每周每时数据')
+        # select_cuhi.select_station_weekday_hour_cuhi(db, output_file['weekday'])
+        # print('统计站点每周每时数据结束', -last_pref_counter + time.perf_counter())
+        # last_pref_counter = time.perf_counter()
+        #
+        # print('开始统计站点每月每周每时数据')
+        # select_cuhi.select_station_month_hour_cuhi(db, output_file['month'])
+        # print('统计站点每月每周每时数据结束', -last_pref_counter + time.perf_counter())
+        # last_pref_counter = time.perf_counter()
+        #
+        # print('开始统计站点每季每周每时数据')
+        # select_cuhi.select_station_season_hour_cuhi(db, output_file['season'])
+        # print('统计站点每季每周每时数据结束', -last_pref_counter + time.perf_counter())
+        # last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每时数据')
+        select_cuhi.select_station_hour_wcuhi(db, output_file['wcuhi'])
+        print('统计站点每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每月每时数据')
+        select_cuhi.select_station_month_hour_wcuhi(db, output_file['month_wcuhi'])
+        print('统计站点每月每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每季每时数据')
+        select_cuhi.select_station_season_hour_wcuhi(db, output_file['season_wcuhi'])
+        print('统计站点每季每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        # 导入天气数据
+        print('开始导入天气数据')
+        import_weather(db, weather_filename)
+        print('导入天气数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        # 统计不同天气状况下的cuhi
+        print('开始统计站点每天气每周每时数据')
+        select_cuhi.select_weather_station_weekday_hour_cuhi(db, output_file['weather'])
+        print('统计站点每天气每周每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每天气每时数据')
+        select_cuhi.select_weather_station_hour_wcuhi(db, output_file['weather_wcuhi'])
+        print('统计站点每天气每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        # print('开始统计站点不同天气每季每时数据')
+        # select_cuhi.select_weather_station_season_hour_wcuhi(db, output_file['season_weather_wcuhi'])
+        # print('统计站点不同天气每季每时数据结束', -last_pref_counter + time.perf_counter())
+        # last_pref_counter = time.perf_counter()
+
+        # 统计不同风向条件下的cuhi
+        print('开始导入风向数据')
+        import_weather(db, direction_filename)
+        print('导入风向数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每风向每周每时数据')
+        select_cuhi.select_weather_station_weekday_hour_cuhi(db, output_file['wind_direction'])
+        print('统计站点每风向每周每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每风向每时数据')
+        select_cuhi.select_weather_station_hour_wcuhi(db, output_file['wind_direction_wcuhi'])
+        print('统计站点每风向每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        # 统计不同风速条件下的cuhi
+        print('开始导入风速数据')
+        import_weather(db, velocity_filename)
+        print('导入风速数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每风速每周每时数据')
+        select_cuhi.select_weather_station_weekday_hour_cuhi(db, output_file['wind_velocity'])
+        print('统计站点每风速每周每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
+
+        print('开始统计站点每风速每时数据')
+        select_cuhi.select_weather_station_hour_wcuhi(db, output_file['wind_velocity_wcuhi'])
+        print('统计站点每风速每时数据结束', -last_pref_counter + time.perf_counter())
+        last_pref_counter = time.perf_counter()
